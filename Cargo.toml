@@ -1,12 +1,10 @@
 [package]
-
 name = "codius-sandbox-core"
 version = "0.0.1"
 authors = ["Torrie Fischer <torrie@ripple.com>"]
 
-[dependencies.seccomp]
-
-git = "https://github.com/tdfischer/seccomp-rust"
+[dependencies.rust-seccomp]
+git = "https://github.com/tdfischer/rust-seccomp"
 
 [[bin]]
 name = "test"
