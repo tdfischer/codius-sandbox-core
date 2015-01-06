@@ -3,6 +3,12 @@ extern crate "rust-seccomp" as seccomp;
 
 use std::ptr;
 use std::default::Default;
+use std::vec::Vec;
+use std::mem;
+use std::iter;
+
+pub type Address = u64;
+pub type Word = u64;
 
 pub enum Action {
   Allow,
@@ -41,33 +47,33 @@ pub enum Event {
 #[deriving(Default)]
 #[deriving(Show)]
 pub struct Registers {
-  pub r15: i64,
-  pub r14: i64,
-  pub r13: i64,
-  pub r12: i64,
-  pub rbp: i64,
-  pub rbx: i64,
-  pub r11: i64,
-  pub r10: i64,
-  pub r9: i64,
-  pub r8: i64,
-  pub rax: i64,
-  pub rcx: i64,
-  pub rdx: i64,
-  pub rsi: i64,
-  pub rdi: i64,
-  pub orig_rax: i64,
-  pub rip: i64,
-  pub cs: i64,
-  pub eflags: i64,
-  pub rsp: i64,
-  pub ss: i64,
-  pub fs_base: i64,
-  pub gs_base: i64,
-  pub ds: i64,
-  pub es: i64,
-  pub fs: i64,
-  pub gs: i64
+  pub r15: Word,
+  pub r14: Word,
+  pub r13: Word,
+  pub r12: Word,
+  pub rbp: Word,
+  pub rbx: Word,
+  pub r11: Word,
+  pub r10: Word,
+  pub r9: Word,
+  pub r8: Word,
+  pub rax: Word,
+  pub rcx: Word,
+  pub rdx: Word,
+  pub rsi: Word,
+  pub rdi: Word,
+  pub orig_rax: Word,
+  pub rip: Word,
+  pub cs: Word,
+  pub eflags: Word,
+  pub rsp: Word,
+  pub ss: Word,
+  pub fs_base: Word,
+  pub gs_base: Word,
+  pub ds: Word,
+  pub es: Word,
+  pub fs: Word,
+  pub gs: Word
 }
 
 bitflags! {
@@ -166,10 +172,10 @@ extern {
 
 #[deriving(Show)]
 pub struct Syscall {
-  pub args: [i64, ..6],
+  pub args: [Word, ..6],
   pub call: seccomp::Syscall,
   pub pid: libc::pid_t,
-  pub returnVal: i64
+  pub returnVal: Word
 }
 
 impl Syscall {
@@ -177,9 +183,56 @@ impl Syscall {
     let regs = getregs (pid);
     Syscall {
       pid: pid,
-      call: FromPrimitive::from_i64(regs.orig_rax).expect("Unknown syscall"),
+      call: FromPrimitive::from_u64(regs.orig_rax).expect("Unknown syscall"),
       args: [regs.rdi, regs.rsi, regs.rdx, regs.rcx, regs.r8, regs.r9],
       returnVal: 0
     }
   }
+}
+
+pub struct Reader {
+  pub pid: libc::pid_t
+}
+
+impl Reader {
+  pub fn new(pid: libc::pid_t) -> Reader {
+    Reader {
+      pid: pid
+    }
+  }
+
+    pub fn peek_data(&self, address: Address) -> Word {
+        unsafe {
+            raw (Request::PeekData, self.pid, address as *mut libc::c_void, ptr::null_mut()) as Word
+        }
+    }
+
+    pub fn read_string(&self, address: Address) -> Vec<u8> {
+        let mut end_of_str = false;
+        let mut buf: Vec<u8> = Vec::with_capacity(1024);
+        let max_addr = address + buf.capacity() as Address;
+        let align_end = max_addr - (max_addr % mem::size_of::<Word>() as Address);
+        'finish: for read_addr in iter::range_step(address, align_end, mem::size_of::<Word>() as Address) {
+            let d = self.peek_data(read_addr);
+            for word_idx in iter::range(0, mem::size_of::<Word>()) {
+                let chr = ((d >> (word_idx*8) as uint) & 0xff) as u8;
+                buf.push (chr);
+                if chr == 0 {
+                    end_of_str = true;
+                    break 'finish;
+                }
+            }
+        }
+        if !end_of_str {
+            let d = self.peek_data(align_end);
+            for word_idx in range(0, mem::size_of::<Word>()) {
+                let chr = ((d >> (word_idx*8) as uint) & 0xff) as u8;
+                buf.push (chr);
+                if chr == 0 {
+                    break;
+                }
+            }
+        }
+        return buf;
+    }
 }

@@ -11,7 +11,6 @@ pub struct Filesystem {
 
 pub struct VFS {
   mountpoints: Vec<Filesystem>,
-  sandbox: &Sandbox
 }
 
 impl VFS {
@@ -24,13 +23,14 @@ impl VFS {
   }
 
   fn do_open(&self, call: &ptrace::Syscall) {
-    println! ("Tried to open a thing");
+    let reader = ptrace::Reader::new(call.pid);
+    let fname = reader.read_string(call.args[0]);
+    println! ("Tried to open a thing: {}", String::from_utf8(fname).unwrap());
   }
 
-  pub fn new(sbox: &mut Sandbox) -> VFS {
+  pub fn new() -> VFS {
     VFS {
       mountpoints: Vec::new(),
-      sandbox: sbox
     }
   }
 }
