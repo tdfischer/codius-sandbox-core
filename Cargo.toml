@@ -6,5 +6,6 @@ authors = ["Torrie Fischer <torrie@ripple.com>"]
 [dependencies.rust-seccomp]
 git = "https://github.com/tdfischer/rust-seccomp"
 
-[[bin]]
-name = "test"
+[lib]
+name = "codius-sandbox-core"
+crate_type = ["staticlib"]
