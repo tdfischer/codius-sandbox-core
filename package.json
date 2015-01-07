@@ -1,0 +1,17 @@
+{
+  "name": "codius-sandbox",
+  "version": "0.0.1",
+  "description": "Codius Sandbox",
+  "main": "main.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "cargo build && node-gyp rebuild"
+  },
+  "author": "",
+  "license": "BSD",
+  "dependencies": {
+    "bindings": "^1.2.1"
+  }
+}
