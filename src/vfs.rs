@@ -1,4 +1,3 @@
-#![feature(macro_rules)]
 extern crate libc;
 extern crate "rust-seccomp" as seccomp;
 

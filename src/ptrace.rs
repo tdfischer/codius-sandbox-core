@@ -6,6 +6,7 @@ use std::default::Default;
 use std::vec::Vec;
 use std::mem;
 use std::iter;
+use std::num::FromPrimitive;
 
 pub type Address = u64;
 pub type Word = u64;
@@ -32,7 +33,7 @@ pub enum Request {
   SetOptions = 0x4200
 }
 
-#[deriving(Show, FromPrimitive)]
+#[derive(Show, FromPrimitive)]
 pub enum Event {
   Fork = 1,
   VFork = 2,
@@ -44,8 +45,7 @@ pub enum Event {
   Stop = 128
 }
 
-#[deriving(Default)]
-#[deriving(Show)]
+#[derive(Default, Show)]
 pub struct Registers {
   pub r15: Word,
   pub r14: Word,
@@ -146,9 +146,9 @@ extern {
             data: *mut libc::c_void) -> libc::c_long;
 }
 
-#[deriving(Show)]
+#[derive(Show)]
 pub struct Syscall {
-  pub args: [Word, ..6],
+  pub args: [Word; 6],
   pub call: seccomp::Syscall,
   pub pid: libc::pid_t,
   pub returnVal: Word

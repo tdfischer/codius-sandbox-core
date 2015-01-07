@@ -6,6 +6,8 @@ use vfs;
 use posix::{PosixResult, WaitResult};
 use std::os;
 use std::ptr;
+use std::num::FromPrimitive;
+use std::ffi::CString;
 
 pub struct Sandbox {
   pub pid: libc::pid_t,
@@ -85,10 +87,10 @@ impl Sandbox {
     unsafe {
       raise (19);
     }
-    let command = argv[0].to_c_str();
+    let command = CString::from_slice(argv[0].as_bytes());
     let mut ptrs : Vec<*const libc::c_char> = Vec::with_capacity(argv.len());
     for arg in argv.iter() {
-      ptrs.push (arg.to_c_str().as_ptr());
+      ptrs.push (CString::from_slice(arg.as_bytes()).as_ptr());
     }
     ptrs.push (ptr::null());
 
