@@ -36,8 +36,8 @@ impl Sandbox {
   pub fn tick(&mut self) {
     let res = self.wait_on_child().expect ("Could not call waitpid");
 
-    if ptrace::WIFSTOPPED (res.status) {
-      if ptrace::WSTOPSIG (res.status) == 5 {
+    if res.is_stopped() {
+      if res.stop_signal() == 5 {
         let st = ((res.status >> 8) & !5) >> 8;
 
         let event: ptrace::Event =
@@ -51,13 +51,13 @@ impl Sandbox {
           _ => ptrace::cont (res.pid, 0)
         }
       } else {
-        println! ("Got stop signal {}", ptrace::WSTOPSIG (res.status));
-        ptrace::cont (self.pid, ptrace::WSTOPSIG (res.status));
+        println! ("Got stop signal {}", res.stop_signal());
+        ptrace::cont (self.pid, res.stop_signal());
       }
-    } else if ptrace::WIFSIGNALED (res.status) {
-      println! ("Killed by {}", ptrace::WTERMSIG (res.status));
+    } else if res.is_signaled() {
+      println! ("Killed by {}", res.term_signal());
       panic! ("Child died by a signal");
-    } else if ptrace::WIFEXITED (res.status) {
+    } else if res.is_exited() {
       panic! ("Child exited.");
     }
   }

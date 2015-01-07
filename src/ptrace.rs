@@ -132,30 +132,6 @@ pub fn traceme() {
   }
 }
 
-pub fn WIFSTOPPED(s: int) -> bool {
-  return (s & 0xff) == 0x7f;
-}
-
-pub fn WSTOPSIG(s: int) -> int {
-  return (s & 0xff00) >> 8;
-}
-
-pub fn WIFCONTINUED(s: int) -> bool {
-  return s == 0xffff;
-}
-
-pub fn WIFSIGNALED(s: int) -> bool {
-  return (((s & 0x7f) + 1) >> 1) > 0;
-}
-
-pub fn WIFEXITED(s: int) -> bool {
-  return WTERMSIG(s) == 0;
-}
-
-pub fn WTERMSIG(s: int) -> int {
-  return s & 0x7f;
-}
-
 unsafe fn raw(request: Request,
        pid: libc::pid_t,
        addr: *mut libc::c_void,
