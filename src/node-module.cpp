@@ -11,7 +11,7 @@ extern "C" {
   struct Sandbox;
   extern Sandbox* sandbox_new();
   extern void sandbox_free(Sandbox*);
-  extern void sandbox_spawn(Sandbox*, char** argv);
+  extern void sandbox_spawn(Sandbox*, const char** argv);
   extern void sandbox_tick(Sandbox*);
 }
 
@@ -114,9 +114,9 @@ NodeSandbox::node_spawn(const Arguments& args)
 {
   HandleScope scope;
   std::vector<std::string> argv (args.Length());
-  char** argv_ptrs = new char*[args.Length()];
   std::map<std::string, std::string> envp;
   SandboxWrapper* wrap;
+  std::vector<const char*> argv_ptrs;
 
   wrap = node::ObjectWrap::Unwrap<SandboxWrapper>(args.This());
 
@@ -170,10 +170,13 @@ NodeSandbox::node_spawn(const Arguments& args)
 
   //wrap->sbox->getVFS().setCWD ("/contract/");
   //wrap->sbox->spawn(argv, envp);
-  for (unsigned int i = 0; i < argv.size(); i++) {
-    argv_ptrs[i] = strdup ("test");
+  for (unsigned int i = 0; i < argv.size()-1; i++) {
+    argv_ptrs.push_back (strdup (argv[i].c_str()));
   }
-  sandbox_spawn (wrap->sbox->m_box.get(), argv_ptrs);
+  argv_ptrs.push_back (0);
+  std::cout << "Pointer count: " << argv_ptrs.size() << std::endl;
+
+  sandbox_spawn (wrap->sbox->m_box.get(), argv_ptrs.data());
   uv_signal_start (&wrap->sbox->m_signal, cb_signal, SIGCHLD);
 
   goto out;
@@ -188,7 +191,6 @@ err_options:
 
 out:
 
-  delete[] argv_ptrs;
   return Undefined();
 }
 
