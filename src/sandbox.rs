@@ -9,13 +9,25 @@ use std::ptr;
 use std::num::FromPrimitive;
 use std::ffi::CString;
 
+#[derive(Show)]
+pub enum Event {
+    Released,
+    Exited
+}
+
 pub struct Sandbox {
   pub pid: libc::pid_t,
   pub running: bool,
-  pub vfs: vfs::VFS
+  pub vfs: vfs::VFS,
+  cb_event: Box<Fn(&Sandbox, Event) + 'static>
 }
 
 impl Sandbox {
+    pub fn event(&self, event: Event) {
+        let h = self.cb_event;
+        h(self, event);
+    }
+
   pub fn spawn(&mut self, argv: &[&str]) {
     self.running = true;
     self.pid = unsafe { fork() };
@@ -66,18 +78,20 @@ impl Sandbox {
 
   fn handle_exit(&mut self, pid: libc::pid_t) {
     println! ("Child exited cleanly. Maybe.");
+    self.event(Event::Exited);
     self.release_child(0);
   }
 
-  fn release_child(&mut self, signal: int) {
+  fn release_child(&mut self, signal: i32) {
     ptrace::release (self.pid, signal);
+    self.event(Event::Released);
     self.running = false;
   }
 
   fn handle_seccomp(&self, pid: libc::pid_t) {
     let regs = ptrace::getregs (pid);
     let mut call = ptrace::Syscall::from_pid (pid);
-    println! ("Attempted syscall {}", call);
+    //println! ("Attempted syscall {:?}", call);
     call = self.vfs.handle_syscall (call);
     ptrace::cont (pid, 0);
   }
@@ -189,7 +203,7 @@ impl Sandbox {
 
     filter.load();
 
-    println! ("Exec {}", command);
+    println! ("Exec {:?}", command);
 
     unsafe {
       libc::execvp (command.as_ptr(), ptrs.as_mut_ptr());
@@ -198,11 +212,12 @@ impl Sandbox {
     panic!("Could not fork, got: {} - {}", os::errno(), os::last_os_error());
   }
 
-  pub fn new() -> Sandbox {
+  pub fn new<H>(handler: H) -> Self where H: Fn(&Sandbox, Event) + 'static {
     Sandbox {
       pid: -1,
       running: false,
-      vfs: vfs::VFS::new()
+      vfs: vfs::VFS::new(),
+      cb_event: Box::new(handler)
     }
   }
 
@@ -216,7 +231,7 @@ impl Sandbox {
     if pid > 0 {
       PosixResult::Ok (WaitResult {
         pid: pid,
-        status: st as int
+        status: st as u32
       })
     } else {
       PosixResult::Error (os::errno())

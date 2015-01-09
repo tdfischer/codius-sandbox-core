@@ -9,7 +9,20 @@ using namespace v8;
 
 extern "C" {
   struct Sandbox;
-  extern Sandbox* sandbox_new();
+
+  struct SandboxOps {
+    void (*released)(Sandbox* sbox);
+    void (*exited)(Sandbox* sbox);
+  };
+
+  enum SandboxEvent {
+    Released,
+    Exited
+  };
+
+  typedef void (*sandbox_event_cb)(Sandbox* sbox, SandboxEvent event);
+
+  extern Sandbox* sandbox_new(sandbox_event_cb);
   extern void sandbox_free(Sandbox*);
   extern void sandbox_spawn(Sandbox*, const char** argv);
   extern void sandbox_tick(Sandbox*);
@@ -27,6 +40,7 @@ public:
   static void Init(v8::Handle<v8::Object> exports);
 
 private:
+  static void cb_event(Sandbox* sbox, SandboxEvent event);
   static v8::Handle<v8::Value> node_spawn(const v8::Arguments& args);
   static v8::Handle<v8::Value> node_kill(const v8::Arguments& args);
   static v8::Handle<v8::Value> node_finish_ipc(const v8::Arguments& args);
@@ -57,8 +71,14 @@ SandboxWrapper::SandboxWrapper()
 SandboxWrapper::~SandboxWrapper()
 {}
 
+void
+NodeSandbox::cb_event(Sandbox* sbox, SandboxEvent evt)
+{
+  std::cout << "Got event " << evt << std::endl;
+}
+
 NodeSandbox::NodeSandbox()
-  : m_box (sandbox_new())
+  : m_box (sandbox_new(NodeSandbox::cb_event))
 {
   uv_signal_init (uv_default_loop(), &m_signal);
   m_signal.data = this;

@@ -4,7 +4,7 @@ use std::os;
 
 pub enum PosixResult<T> {
   Ok(T),
-  Error(uint)
+  Error(usize)
 }
 
 impl <T> PosixResult<T> {
@@ -18,7 +18,7 @@ impl <T> PosixResult<T> {
 
 pub struct WaitResult {
   pub pid: libc::pid_t,
-  pub status: int
+  pub status: u32
 }
 
 
@@ -27,7 +27,7 @@ impl WaitResult {
         (self.status & 0xff) == 0x7f
     }
 
-    pub fn stop_signal(&self) -> int {
+    pub fn stop_signal(&self) -> u32 {
         (self.status & 0xff00) >> 8
     }
 
@@ -39,7 +39,7 @@ impl WaitResult {
         self.stop_signal() == 0
     }
 
-    pub fn term_signal(&self) -> int {
+    pub fn term_signal(&self) -> u32 {
         self.status & 0x7f
     }
 

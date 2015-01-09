@@ -5,7 +5,7 @@ use std::vec::Vec;
 use ptrace;
 
 pub struct Filesystem {
-  foo: int
+  foo: u32
 }
 
 pub struct VFS {

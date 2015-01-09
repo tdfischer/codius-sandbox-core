@@ -1,6 +1,7 @@
+#![feature(unboxed_closures)]
 extern crate libc;
 
-pub use sandbox::Sandbox;
+pub use sandbox::{Sandbox, Event};
 use std::mem;
 use std::ptr;
 use std::ffi;
@@ -13,9 +14,16 @@ mod posix;
 
 pub type sbox_ptr = *const ();
 
+pub type sandbox_event_cb = extern "C" fn(sbox: sbox_ptr, event: Event);
+
 #[no_mangle]
-pub unsafe extern "C" fn sandbox_new () -> sbox_ptr {
-    let sbox: Box<Sandbox> = box Sandbox::new();
+pub unsafe extern "C" fn sandbox_new (event_cb: sandbox_event_cb) -> sbox_ptr {
+    let sbox = Sandbox::new(
+        |sbox,e| {
+            let s: sbox_ptr = mem::transmute(sbox);
+            event_cb (s, e);
+        }
+    );
     mem::transmute (sbox)
 }
 
@@ -31,7 +39,7 @@ pub unsafe extern "C" fn sandbox_spawn (sbox: sbox_ptr, argv: *const *const libc
     let mut i = 0;
     loop {
         let s = *argv.offset(i);
-        println!("{}: {}", i, s);
+        println!("{}: {:?}", i, s);
         if (s.is_null()) {
             break;
         }

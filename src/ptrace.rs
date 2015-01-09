@@ -114,13 +114,13 @@ pub fn attach(pid: libc::pid_t) {
   }
 }
 
-pub fn release(pid: libc::pid_t, signal: int) {
+pub fn release(pid: libc::pid_t, signal: i32) {
   unsafe {
     raw (Request::Detatch, pid, ptr::null_mut(), signal as *mut libc::c_void);
   }
 }
 
-pub fn cont(pid: libc::pid_t, signal: int) {
+pub fn cont(pid: libc::pid_t, signal: u32) {
   unsafe {
     raw (Request::Continue, pid, ptr::null_mut(), signal as *mut libc::c_void);
   }
@@ -191,7 +191,7 @@ impl Reader {
         'finish: for read_addr in iter::range_step(address, align_end, mem::size_of::<Word>() as Address) {
             let d = self.peek_data(read_addr);
             for word_idx in iter::range(0, mem::size_of::<Word>()) {
-                let chr = ((d >> (word_idx*8) as uint) & 0xff) as u8;
+                let chr = ((d >> (word_idx*8) as u32) & 0xff) as u8;
                 buf.push (chr);
                 if chr == 0 {
                     end_of_str = true;
@@ -202,7 +202,7 @@ impl Reader {
         if !end_of_str {
             let d = self.peek_data(align_end);
             for word_idx in range(0, mem::size_of::<Word>()) {
-                let chr = ((d >> (word_idx*8) as uint) & 0xff) as u8;
+                let chr = ((d >> (word_idx*8) as u32) & 0xff) as u8;
                 buf.push (chr);
                 if chr == 0 {
                     break;
