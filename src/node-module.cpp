@@ -10,19 +10,18 @@ using namespace v8;
 extern "C" {
   struct Sandbox;
 
-  struct SandboxOps {
-    void (*released)(Sandbox* sbox);
-    void (*exited)(Sandbox* sbox);
-  };
-
   enum SandboxEvent {
     Released,
     Exited
   };
 
-  typedef void (*sandbox_event_cb)(Sandbox* sbox, SandboxEvent event);
 
-  extern Sandbox* sandbox_new(sandbox_event_cb);
+  typedef struct _sandbox_ops {
+    void* data;
+    void (*event)(Sandbox* sbox, SandboxEvent evt, void* data);
+  } sandbox_ops ;
+
+  extern Sandbox* sandbox_new(sandbox_ops*);
   extern void sandbox_free(Sandbox*);
   extern void sandbox_spawn(Sandbox*, const char** argv);
   extern void sandbox_tick(Sandbox*);
@@ -33,22 +32,27 @@ public:
   void operator()(Sandbox* s) {sandbox_free (s);}
 };
 
+class SandboxWrapper;
+
 class NodeSandbox {
 public:
-  NodeSandbox();
+  NodeSandbox(SandboxWrapper* wrap);
   ~NodeSandbox();
   static void Init(v8::Handle<v8::Object> exports);
 
 private:
-  static void cb_event(Sandbox* sbox, SandboxEvent event);
+  static void cb_event(Sandbox* sbox, SandboxEvent event, void* data);
   static v8::Handle<v8::Value> node_spawn(const v8::Arguments& args);
   static v8::Handle<v8::Value> node_kill(const v8::Arguments& args);
   static v8::Handle<v8::Value> node_finish_ipc(const v8::Arguments& args);
   static v8::Handle<v8::Value> node_new(const v8::Arguments& args);
   static v8::Persistent<v8::Function> s_constructor;
   static void cb_signal (uv_signal_t* handle, int signum);
+  void emitEvent(const std::string& name, std::vector<Handle<Value> >& argv);
   std::unique_ptr<Sandbox, SandboxDeleter> m_box;
   uv_signal_t m_signal;
+
+  SandboxWrapper* m_wrap;
 };
 
 class SandboxWrapper : public node::ObjectWrap {
@@ -65,21 +69,53 @@ extern "C" {
 }
 
 SandboxWrapper::SandboxWrapper()
-  : sbox (new NodeSandbox())
+  : sbox (new NodeSandbox(this))
 {}
 
 SandboxWrapper::~SandboxWrapper()
 {}
 
 void
-NodeSandbox::cb_event(Sandbox* sbox, SandboxEvent evt)
+NodeSandbox::emitEvent(const std::string& name, std::vector<Handle<Value> >& argv)
 {
-  std::cout << "Got event " << evt << std::endl;
+  std::vector<Handle<Value> >  args;
+  args.push_back (String::NewSymbol (name.c_str()));
+  args.insert (args.end(), argv.begin(), argv.end());
+  node::MakeCallback (m_wrap->handle_, "emit", args.size(), args.data());
 }
 
-NodeSandbox::NodeSandbox()
-  : m_box (sandbox_new(NodeSandbox::cb_event))
+void
+NodeSandbox::cb_event(Sandbox* sbox, SandboxEvent evt, void* data)
 {
+  NodeSandbox* self = (NodeSandbox*)data;
+  std::cout << "Got event " << evt << std::endl;
+  switch (evt) {
+    case Released: {
+      uv_signal_stop (&self->m_signal);
+      std::vector<Handle<Value> > args;
+      self->emitEvent ("release", args);
+                   }
+      break;
+    case Exited: {
+      std::vector<Handle<Value> > args = {
+        Int32::New (0)
+      };
+      self->emitEvent ("exit", args);
+                 }
+      break;
+  }
+}
+
+NodeSandbox::NodeSandbox(SandboxWrapper* wrap)
+  : m_wrap(wrap)
+{
+  sandbox_ops ops = {
+    .data = this,
+    .event = NodeSandbox::cb_event
+  };
+
+  m_box.reset (sandbox_new (&ops));
+
   uv_signal_init (uv_default_loop(), &m_signal);
   m_signal.data = this;
 }

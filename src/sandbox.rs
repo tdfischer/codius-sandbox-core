@@ -15,16 +15,16 @@ pub enum Event {
     Exited
 }
 
-pub struct Sandbox {
+pub struct Sandbox<'a> {
   pub pid: libc::pid_t,
   pub running: bool,
   pub vfs: vfs::VFS,
-  cb_event: Box<Fn(&Sandbox, Event) + 'static>
+  cb_event: Box<Fn(&Sandbox, Event) + 'a>
 }
 
-impl Sandbox {
+impl<'a> Sandbox<'a> {
     pub fn event(&self, event: Event) {
-        let h = self.cb_event;
+        let h = &self.cb_event;
         h(self, event);
     }
 
@@ -212,12 +212,12 @@ impl Sandbox {
     panic!("Could not fork, got: {} - {}", os::errno(), os::last_os_error());
   }
 
-  pub fn new<H>(handler: H) -> Self where H: Fn(&Sandbox, Event) + 'static {
+  pub fn new(handler: Box<Fn(&Sandbox, Event) + 'a>) -> Self {
     Sandbox {
       pid: -1,
       running: false,
       vfs: vfs::VFS::new(),
-      cb_event: Box::new(handler)
+      cb_event: handler
     }
   }
 

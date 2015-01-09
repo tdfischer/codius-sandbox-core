@@ -12,45 +12,55 @@ mod vfs;
 mod ptrace;
 mod posix;
 
-pub type sbox_ptr = *const ();
+pub type SandboxPtr = *mut libc::c_void;
 
-pub type sandbox_event_cb = extern "C" fn(sbox: sbox_ptr, event: Event);
-
-#[no_mangle]
-pub unsafe extern "C" fn sandbox_new (event_cb: sandbox_event_cb) -> sbox_ptr {
-    let sbox = Sandbox::new(
-        |sbox,e| {
-            let s: sbox_ptr = mem::transmute(sbox);
-            event_cb (s, e);
-        }
-    );
-    mem::transmute (sbox)
+#[repr(C)]
+#[derive(Copy)]
+pub struct sandbox_ops {
+    data: *mut libc::c_void,
+    event: extern "C" fn(sbox: SandboxPtr, event: Event, data: *mut libc::c_void)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sandbox_free (sbox: sbox_ptr) {
-    let _: Box<Sandbox> = mem::transmute (sbox);
+pub extern "C" fn sandbox_new (ops: *mut sandbox_ops) -> SandboxPtr {
+    let f = unsafe { (*ops).event };
+    let data = unsafe { (*ops).data };
+    let sbox: Box<Sandbox> = Box::new(Sandbox::new(
+        Box::new(move |&:sbox:&Sandbox, e| {
+            unsafe {
+                f(mem::transmute(sbox), e, data);
+            }
+        })
+    ));
+    unsafe {
+        mem::transmute (sbox)
+    }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sandbox_spawn (sbox: sbox_ptr, argv: *const *const libc::c_char) {
-    let mut sbox: Box<Sandbox> = mem::transmute (sbox);
+pub extern "C" fn sandbox_free (sbox: SandboxPtr) {
+    let _: Box<Sandbox> = unsafe { mem::transmute (sbox) };
+}
+
+#[no_mangle]
+pub extern "C" fn sandbox_spawn (sbox: SandboxPtr, argv: *const *const libc::c_char) {
+    let mut sbox: Box<Sandbox> = unsafe { mem::transmute (sbox) };
     let mut ptrs: Vec<&str> = Vec::new();
     let mut i = 0;
     loop {
-        let s = *argv.offset(i);
+        let s = unsafe { *argv.offset(i) };
         println!("{}: {:?}", i, s);
-        if (s.is_null()) {
+        if s.is_null() {
             break;
         }
-        ptrs.push(str::from_c_str(s));
+        ptrs.push(unsafe { str::from_c_str(s) });
         i += 1;
     }
     sbox.spawn(ptrs.as_slice());
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sandbox_tick (sbox: sbox_ptr) {
-    let mut sbox: Box<Sandbox> = mem::transmute (sbox);
+pub extern "C" fn sandbox_tick (sbox: SandboxPtr) {
+    let mut sbox: Box<Sandbox> = unsafe { mem::transmute (sbox) };
     sbox.tick();
 }
